@@ -1,0 +1,1275 @@
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="stylesheet" type="text/css" href="index.css">
+
+<div >
+	<canvas id="ctx" width="1400" height="700" style="align-content: center" ></canvas>
+</div>
+<div id="gameDiv">
+	<div id="chat-text" style="display:none" class="chatText"></div>
+	<form id="chat-form">
+		<input id="chat-input" type="text" style="display:none" autocomplete="off" class="chatForm" onkeydown="chatEnter(event)">
+	</form>
+
+</div>
+
+
+<div id="nameDiv">
+	<input id="username" autocomplete="off" class="username" placeholder="Name" onkeydown="enterUser(event)" maxlength="15" type="text"><br>
+</div>
+<script src="/howler.js"></script>
+<script src="/socket.js"></script>
+<script>
+	var socket = io();
+	var c = document.getElementById("ctx");
+	var ctx = c.getContext("2d");
+	var Img = {};
+	var dice = {};
+	var displayDice = false;
+	var displayRoll = false;
+	var displayName = true;
+	var displayHu = false;
+	var confirmHu = false;
+	var displayDiscard = false;
+	var displayDraw = false;
+	var displayChi = false;
+	var displayPong = false;
+	var displayGang = false;
+	var displayAnGang = false;
+	var displayMingGang = false;
+	var displayEndRound = false;
+	var username = document.getElementById("username");
+	var chat = document.getElementById("chat-input");
+	var chatText = document.getElementById("chat-text");
+	var socketid;
+	var playerData = []
+	var discardPile = []
+	var myPosition = 0;
+	var selection = -1;
+	var selection2 = -1;
+	var currentTurn = 0;
+	var winningHand = []
+	var winningHandPosition = -1;
+	var currentFong = -1;
+	var tilesLeft = -1;
+	var audio = {};
+	var firstLoad = true;
+
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+	Img.background = new Image();	
+	Img.background.src = 'background.jpg';
+	Img.man = [];
+	Img.suo = [];
+	Img.tong = [];
+	Img.hua = [];
+	Img.redhua = [];
+	Img.dice = [];
+
+	playerData[0] = {name:"Player 1",handsize:0,flower:[],shownHand:[],money:20.0}
+	playerData[1] = {name:"Player 2",handsize:0,flower:[],shownHand:[],money:20.0}
+	playerData[2] = {name:"Player 3",handsize:0,flower:[],shownHand:[],money:20.0}
+	playerData[3] = {name:"Player 4",handsize:0,flower:[],shownHand:[],money:20.0}
+	for(let i=1; i<10; i++)
+	{
+		Img.man[i] = new Image();
+		Img.man[i].src = 'man' + i + '.png';
+		Img.suo[i] = new Image();
+		Img.suo[i].src = 'suo' + i + '.png';
+		Img.tong[i] = new Image();
+		Img.tong[i].src = 'tong' + i + '.png';
+	}
+	for(let i=1; i<5; i++)
+	{
+		Img.redhua[i] = new Image();
+		Img.redhua[i].src = 'redhua' + i + '.png';
+		Img.hua[i] = new Image();
+		Img.hua[i].src = 'hua' + i + '.png';
+	}
+	for(let i=1; i<7; i++)
+	{
+		Img.dice[i] = new Image();
+		Img.dice[i].src = 'dice' + i + '.png';
+	}
+	Img.zhong = new Image();
+	Img.zhong.src = "zhong.png"
+	Img.facai = new Image();
+	Img.facai.src = "facai.png"
+	Img.baiban = new Image();
+	Img.baiban.src = "baiban.png"
+	Img.chicken = new Image();
+	Img.chicken.src = "chicken.png"
+	Img.cat = new Image();
+	Img.cat.src = "cat.png"
+	Img.mouse = new Image();
+	Img.mouse.src = "mouse.png"
+	Img.centipede = new Image();
+	Img.centipede.src = "centipede.png"
+	Img.dong = new Image();
+	Img.dong.src = "dong.png"
+	Img.nan = new Image();
+	Img.nan.src = "nan.png"
+	Img.xi = new Image();
+	Img.xi.src = "xi.png"
+	Img.mixfong = new Image();
+	Img.mixfong.src = "mixfong.png"
+	Img.bei = new Image();
+	Img.bei.src = "bei.png"
+	Img.dongfong= new Image();
+	Img.dongfong.src = "dongfong.png"
+	Img.nanfong = new Image();
+	Img.nanfong.src = "nanfong.png"
+	Img.xifong = new Image();
+	Img.xifong.src = "xifong.png"
+	Img.beifong = new Image();
+	Img.beifong.src = "beifong.png"
+	socket.on("hideDice",function(){
+		displayDice=false;
+		chat.style.display = 'inline-block';
+	})
+
+	socket.on("checkID",function(){
+		socket.emit("ID",{socketid:localStorage.getItem("ID")})	
+	})
+
+	socket.on("chi",function(){
+		displayChi = true;
+	})
+
+	socket.on("reset",function(){
+	 displayHu = false;
+	 displayDiscard = false;
+	 displayDraw = false;
+	 displayChi = false;
+	 displayPong = false;
+	 displayGang = false;
+	 displayAnGang = false;
+	 displayMingGang = false;
+	 confirmHu = false;
+	 winningHandPosition = -1;
+	 winningHand = [];
+	})
+
+	socket.on("retrieve",function(){
+		displayAnGang = JSON.parse(localStorage.getItem("displayAnGang"))
+		displayChi = JSON.parse(localStorage.getItem("displayChi"))
+		displayDiscard = JSON.parse(localStorage.getItem("displayDiscard"))
+		displayDraw = JSON.parse(localStorage.getItem("displayDraw"))
+		displayEndRound = JSON.parse(localStorage.getItem("displayEndRound"))
+		displayGang = JSON.parse(localStorage.getItem("displayGang"))
+		displayHu = JSON.parse(localStorage.getItem("displayHu"))
+		displayMingGang = JSON.parse(localStorage.getItem("displayMingGang"))
+		displayPong = JSON.parse(localStorage.getItem("displayPong"))
+		chat.style.display = 'inline-block';
+	})
+	socket.on("currentFong",function(data)
+	{
+		currentFong = data.currentFong;
+	})
+
+	socket.on("pong1",function(){
+		console.log("asked to pong")
+		displayPong = true;
+	})
+
+	socket.on("gang",function(){
+		displayGang = true;
+	})
+
+	socket.on("clearAll",function(){
+		displayChi = false;
+		displayPong = false;
+		displayHu = false;
+		displayDraw = false;
+		displayGang = false;
+	})
+
+	socket.on("draw",function(){
+		displayDraw = true;
+		displayDiscard = false;
+		displayAnGang = false;
+		displayMingGang = false;
+	})
+	
+	socket.on("drawDone",function(){
+		displayDraw = false;
+		displayDiscard = true;
+		displayHu = true;
+		displayChi = false;
+		displayPong = false;
+		displayGang = false;
+	})
+
+	socket.on("angang",function(){
+		displayAnGang = true;
+	})
+
+	
+	socket.on("minggang",function(){
+		displayMingGang = true;
+	})
+	
+	socket.on("endDiscard",function(){
+		console.log("received")
+		displayDiscard=false;
+		displayHu = false;
+		displayAnGang = false;
+		displayMingGang = false;
+	})
+
+	socket.on("hu",function(){
+		displayHu = true;
+	})
+
+	socket.on("hidehu",function(){
+		displayHu = false;
+		displayPong = false;
+		displayGang = false;
+	})
+	socket.on("discard",function(){
+		displayDiscard=true;
+		displayChi=false;
+		displayHu = true;
+		displayPong =false;
+		displayGang = false;
+		displayDraw=false;
+		selection2 = -1;
+		selection = -1;
+	})
+
+	socket.on("result",function(data){
+		dice = data;
+		displayDice = true;
+		displayRoll = false;
+	})
+	
+	socket.on("updateTurn",function(data){
+		currentTurn = data.currentTurn
+		console.log("turn",currentTurn,myPosition)
+	})
+
+	socket.on("closeUsername",function(data){
+		socketid = data.socketid;
+		localStorage.setItem("ID", data.socketid);
+		displayName=false;
+		document.getElementById("nameDiv").style.display="none";
+	})
+	
+	socket.on("startRoll",function(){
+		displayRoll=true;
+	})
+	var myTiles = []
+	socket.on("update",function(data){
+		myTiles=data.packet;
+		playerData = data.playerData;
+		discardPile = data.discardPile;
+
+	})
+
+	socket.on("playGang",function(){
+		audio.gang.play();
+	})
+
+	socket.on("playHua",function(){
+		audio.hua.play();
+	})
+
+	
+	socket.on("playKnock",function(){
+		audio.knock.play();
+	})
+
+	socket.on("playCoffin",function(){
+		audio.coffin.play();
+	})
+
+	socket.on("playCao",function(){
+		audio.cao.play();
+	})
+
+	socket.on("playWow",function(){
+		audio.wow.play();
+	})
+
+	socket.on("playWhat",function(){
+		audio.what.play();
+	})
+
+	socket.on("playPong",function(){
+		audio.pong.play();
+	})
+
+	socket.on("playTak",function(){
+		audio.tak.play();
+	})
+
+	socket.on("addText",function(data){
+		chatText.style.display = "inline-block";
+		chatText.innerHTML += '<div>' + data.text + '</div>';
+		chatText.scrollTop = chatText.scrollHeight;
+	})
+
+
+	socket.on("tilesLeft",function(data){
+		tilesLeft = data.tilesLeft;
+	})
+
+	socket.on("yourPosition",function(data){
+		myPosition = data.position
+		console.log("myPosition", myPosition)
+	})
+
+	socket.on("win",function(data){
+		audio.hu.play();
+		displayHu = false;
+		displayDiscard = false;
+		displayDraw = false;
+		displayChi = false;
+		displayPong = false;
+		displayGang = false;
+			winningHandPosition = data.position
+		winningHand = data.hand;
+	})
+
+	socket.on("endround",function(){
+		displayEndRound = true;
+	})
+	
+	window.onresize = function () {
+    c.width = window.innerWidth;
+	c.height = window.innerHeight;
+	}
+
+	function chatEnter(e){
+		if(e.key === 'Enter') {
+			e.preventDefault();
+			if(chat.value.length >0)
+			{
+			var text = chat.value;
+			if(text.slice(0,1)  == "/")
+			{
+				text = text.slice(1).split(" ")
+				if(text[0] == "pay" && text.length >2)
+				{
+					var position = parseInt(text[1])
+					var amount = parseFloat(text[2])
+					if(position >0  && position<4 && amount >0)
+						socket.emit("pay",{
+							myPosition:myPosition,
+							position:position,
+							amount:amount
+						})
+						
+				}
+				if(text[0]== "play" && text[1] == "knock")
+				{
+					socket.emit("knock");
+				}
+				if(text[0]== "play" && text[1] == "coffin")
+				{
+					socket.emit("coffin");
+				}
+				if(text[0]== "play" && text[1] == "wow")
+				{
+					socket.emit("wow");
+				}
+				if(text[0]== "play" && text[1] == "cao")
+				{
+					socket.emit("cao");
+				}
+				if(text[0]== "play" && text[1] == "what")
+				{
+					socket.emit("what");
+				}
+				if(text[0]== "set" && text[1] == "drawSpeed" && parseInt(text[2])>0)
+				{
+					socket.emit("setSpeed",{
+						speed:parseInt(text[2])
+					});
+				}
+			}
+			else
+			socket.emit("chat",{
+				myPosition:myPosition,
+				text:text
+			})
+			chat.value = '';
+		}
+	}
+	}
+
+	function enterUser(e){
+		if(e.key === 'Enter' && username.value.length >0) {
+			socket.emit("username",{
+				username:username.value
+			})
+		}
+	}
+
+	function drawImageRotated(image,angle,x,y,width,height){
+		ctx.save();
+		ctx.translate(x,y);
+		ctx.rotate(angle);
+		ctx.drawImage(image, -image.width / 2, -image.height / 2,width,height);
+		ctx.translate(-x,-y);
+		ctx.restore();
+	}
+	function drawName(){
+		ctx.beginPath();
+		ctx.rect(c.width/2-150, c.height/2-40, 300, 80); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+	}
+
+	function drawMyTiles(){
+		var start = c.width/2- myTiles.length*25
+		var startFlower = c.width/2- playerData[myPosition].flower.length*25 - 10
+		var totalHand =  playerData[myPosition].shownHand.length * 3
+		for(let i in playerData[myPosition].shownHand)
+		{
+			startFlower-= playerData[myPosition].shownHand[i].length*25
+		}
+		for(var i in myTiles)
+		{
+			tile = myTiles[i];
+			if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				if((totalHand + parseInt(i))== 13 && winningHandPosition ==-1)
+				ctx.drawImage(Img[tile.slice(0,-1)][tile.slice(-1)],start+i*50 +50,c.height-90,50,66)
+				else
+				ctx.drawImage(Img[tile.slice(0,-1)][tile.slice(-1)],start+i*50,c.height-90,50,66)
+			}
+			else
+			{
+				if((totalHand + parseInt(i))== 13 && winningHandPosition == -1)
+				ctx.drawImage(Img[tile],start+i*50 + 50,c.height-90,50,66)
+				else
+				ctx.drawImage(Img[tile],start+i*50,c.height-90,50,66)
+			}
+		}
+
+		for(var i in playerData[myPosition].flower)
+		{
+			tile = playerData[myPosition].flower[i];
+			if(tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				ctx.drawImage(Img[tile.slice(0,-1)][tile.slice(-1)],startFlower+i*50,c.height-170,50,66)
+			}
+			else
+				ctx.drawImage(Img[tile],startFlower+i*50,c.height-170,50,66)
+		}
+		startFlower+= playerData[myPosition].flower.length*50 + 20
+		for(var i in playerData[myPosition].shownHand)
+		{
+			tiles = playerData[myPosition].shownHand[i];
+			for(var x in tiles)
+			{
+				tile = tiles[x];
+				if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				ctx.drawImage(Img[tile.slice(0,-1)][tile.slice(-1)],startFlower+x*50,c.height-170,50,66)
+			}
+				else
+				ctx.drawImage(Img[tile],startFlower+x*50,c.height-170,50,66)
+			}
+
+			startFlower+= playerData[myPosition].shownHand[i].length*50 +20;
+
+		}
+	}
+
+	function drawRoll(){
+		ctx.beginPath();
+		ctx.rect(c.width/2-100, c.height/2-50, 200, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('Roll', c.width/2-50, c.height/2+20);
+	}
+
+	
+	function drawDiscard(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 +30,	 c.height/2-50, 200, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('Discard', c.width/2+50, c.height/2+20);
+	}
+
+	function drawPong(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 - 60,	 c.height/2-50, 150, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('Pong', c.width/2- 40, c.height/2+20);
+	}
+
+	function drawGang(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 - 60,	 c.height/2+70, 150, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('Gang', c.width/2- 40, c.height/2+140);
+	}
+
+	function drawAnGang(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 - 60,	 c.height/2+70, 240, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('An Gang', c.width/2- 40, c.height/2+140);
+	}
+
+	function drawAnGang(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 - 60,	 c.height/2+70, 240, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('An Gang', c.width/2- 40, c.height/2+140);
+	}
+
+	function drawEndRound(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 -150,	 c.height/2-50, 300, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('End Round', c.width/2- 125, c.height/2 +20);
+	}
+
+
+	function drawMingGang(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 +200,	 c.height/2+70, 280, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('Ming Gang', c.width/2 + 220, c.height/2+140);
+	}
+
+
+	function drawChi(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 +120,	 c.height/2-50, 120, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('Chi', c.width/2+140, c.height/2+20);
+	}
+
+	function drawDraw(){
+		ctx.beginPath();
+		ctx.rect(c.width/2 -240,	 c.height/2-50, 150, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		ctx.fillStyle = '#000000';
+		ctx.fillText('Draw', c.width/2-220, c.height/2+20);
+	}
+
+	function drawHu(){
+		ctx.beginPath();
+		ctx.rect(c.width/2+270, c.height/2-50, 140, 100); 
+		ctx.fillStyle = '#FFFFFF'; 
+		ctx.fillStyle = 'rgba(225,225,225,0.5)';
+		ctx.fill(); 
+		ctx.lineWidth = 2;
+		ctx.strokeStyle = '#000000'; 
+		ctx.stroke();
+		ctx.closePath();
+		ctx.font = '40pt Kremlin Pro Web';
+		if(confirmHu)
+		ctx.fillStyle = "#FF0000";
+		else
+		ctx.fillStyle = '#000000';
+		ctx.fillText('Hu', c.width/2+300, c.height/2+20);
+	}
+
+	function drawBackground(){
+		ctx.drawImage(Img.background,0,0,c.width,c.height)		
+		if(currentFong==0)
+		ctx.drawImage(Img.dongfong,c.width-80,0,80,80)		
+		if(currentFong==1)
+		ctx.drawImage(Img.nanfong,c.width-80,0,80,80)		
+		if(currentFong==2)
+		ctx.drawImage(Img.xifong,c.width-80,0,80,80)		
+		if(currentFong==3)
+		ctx.drawImage(Img.beifong,c.width-80,0,80,80)	
+		if(currentFong==4)
+		ctx.drawImage(Img.mixfong,c.width-80,0,80,80)	
+		if(currentTurn == (parseInt(myPosition)+2)%4)
+		ctx.fillStyle = '#ff0000';
+		else
+		ctx.fillStyle = '#000000';
+		ctx.font = '20pt Kremlin Pro Web';
+		if(0 == (parseInt(myPosition)+2)%4)
+		ctx.fillText(playerData[(parseInt(myPosition)+2)%4].name + " (banker)" + " $" + playerData[(parseInt(myPosition)+2)%4].money.toFixed(2), c.width/2-40, 40);
+		else
+		ctx.fillText(playerData[(parseInt(myPosition)+2)%4].name + " $" + playerData[(parseInt(myPosition)+2)%4].money.toFixed(2), c.width/2-40, 40);
+		ctx.save();
+		if(currentTurn == (parseInt(myPosition)+3)%4)
+		ctx.fillStyle = '#ff0000';
+		else
+		ctx.fillStyle = '#000000';
+		ctx.textAlign="center";
+		ctx.textBaseline="middle";
+		ctx.translate(20,c.height/2);
+		ctx.rotate(Math.PI/2);
+		if(0 == (parseInt(myPosition)+3)%4)
+		ctx.fillText(playerData[(parseInt(myPosition)+3)%4].name + " (banker)" + " $" + playerData[(parseInt(myPosition)+3)%4].money.toFixed(2), 0, 0);
+		else
+		ctx.fillText(playerData[(parseInt(myPosition)+3)%4].name + " $" + playerData[(parseInt(myPosition)+3)%4].money.toFixed(2), 0, 0);
+		ctx.restore();
+		ctx.save();
+		if(currentTurn == (parseInt(myPosition)+1)%4)
+		ctx.fillStyle = '#ff0000';
+		else
+		ctx.fillStyle = '#000000';
+		ctx.textAlign="center";
+		ctx.textBaseline="middle";
+		ctx.translate(c.width-20,c.height/2);
+		ctx.rotate(Math.PI*3/2);
+		if(0 == (parseInt(myPosition)+1)%4)
+		ctx.fillText(playerData[(parseInt(myPosition)+1)%4].name + " (banker)" + " $" + playerData[(parseInt(myPosition)+1)%4].money.toFixed(2), 0, 0);
+		else
+		ctx.fillText(playerData[(parseInt(myPosition)+1)%4].name + " $" + playerData[(parseInt(myPosition)+1)%4].money.toFixed(2), 0, 0);
+		ctx.restore();
+
+	}
+
+	function drawDice(){
+		ctx.drawImage(Img.dice[dice.dice1],c.width/2-70,c.height/2,50,50);
+		ctx.drawImage(Img.dice[dice.dice2],c.width/2,c.height/2,50,50);
+		ctx.drawImage(Img.dice[dice.dice3],c.width/2+70,c.height/2,50,50);
+	}
+
+	function drawTilesFront(tiles){
+		ctx.beginPath();
+		var x = (parseInt(myPosition)+2)%4
+		var start = c.width/2- tiles*25;
+		var startFlower = c.width/2 - playerData[x].flower.length*25 - 10
+		for(let i in playerData[x].shownHand)
+		{
+			startFlower-= playerData[x].shownHand[i].length*25
+		}
+		if(winningHandPosition != -1 && winningHandPosition == (parseInt(myPosition)+2)%4)
+		{
+			for(var i in winningHand)
+			{
+			tile = winningHand[i];
+			if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI,c.width/2-winningHand.length*25+i*50,30,50,66)
+			}
+			else
+			drawImageRotated(Img[tile],Math.PI,c.width/2-winningHand.length*25+i*50,30,50,66)
+			}
+		}
+		else
+		{
+		for(var i=0;i<tiles;i++)
+		{
+			ctx.rect(start + i*50, 70, 50, 30);
+			ctx.fillStyle = "white";
+			ctx.fill();
+			ctx.stroke();
+		}
+		}
+		for(var i in playerData[x].flower)
+		{
+			tile = playerData[x].flower[i];
+			if(tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI,startFlower+i*50,90,50,66)
+			}
+			else
+			drawImageRotated(Img[tile],Math.PI,startFlower+i*50,90,50,66)
+		}
+
+		startFlower+= playerData[x].flower.length*50 + 20
+		for(var i in playerData[x].shownHand)
+		{
+			tiles = playerData[x].shownHand[i];
+			for(var g in tiles)
+			{
+				tile = tiles[g];
+				if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI,startFlower+g*50,90,50,66)
+			}
+				else
+				drawImageRotated(Img[tile],Math.PI,startFlower+g*50,90,50,66)
+			}
+			startFlower+= playerData[x].shownHand[i].length*50 +20;
+
+		}
+	}
+
+	function drawTilesLeft(tiles){
+		ctx.beginPath();
+		var x = (parseInt(myPosition)+3)%4 
+		var start = c.height/2 - tiles*25
+		var startFlower = c.height/2 - playerData[x].flower.length*25 + 100;
+		for(let i in playerData[x].shownHand)
+		{
+			startFlower-= playerData[x].shownHand[i].length*25
+		}
+		if(winningHandPosition != -1 && winningHandPosition == (parseInt(myPosition)+3)%4)
+		{
+		for(var i in winningHand)
+		{
+			tile = winningHand[i];
+			if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI/2,30,c.height/2-winningHand.length*25 + 100 + i*50,50,66)
+			}
+			else
+			drawImageRotated(Img[tile],Math.PI/2,30,c.height/2-winningHand.length*25 + i*50 + 100,50,66)
+		}
+		}
+		else
+		{
+		for(var i=0;i<tiles;i++)
+		{
+			ctx.rect(70, start + i*50, 30, 50);
+			ctx.fillStyle = "white";	
+			ctx.fill();
+			ctx.stroke();
+		}
+		}
+		//here
+		for(var i in playerData[x].flower)
+		{
+			tile = playerData[x].flower[i];
+			if(tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI/2,120,startFlower+i*50,50,66)
+			}
+			else
+			drawImageRotated(Img[tile],Math.PI/2,120,startFlower+i*50,50,66)
+		}
+		startFlower+= playerData[x].flower.length*50 + 5
+		for(var i in playerData[x].shownHand)
+		{
+			tiles = playerData[x].shownHand[i];
+			for(var g in tiles)
+			{
+				tile = tiles[g];
+				if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+				{
+					drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI/2,120,startFlower+g*50,50,66)
+				}
+				else
+				drawImageRotated(Img[tile],Math.PI/2,120,startFlower+g*50,50,66)
+			}
+			startFlower+= playerData[x].shownHand[i].length*50 +5;
+			
+		}	
+		ctx.restore();
+	}
+	
+	function drawTilesRight(tiles){
+		ctx.beginPath();
+		var x = (parseInt(myPosition)+1)%4
+		var start = c.height/2- tiles*25
+		var startFlower = c.height/2 - playerData[x].flower.length*25;
+		for(let i in playerData[x].shownHand)
+		{
+			startFlower-= playerData[x].shownHand[i].length*25
+		}
+		if(winningHandPosition != -1 && winningHandPosition == (parseInt(myPosition)+1)%4)
+		{
+		for(var i in winningHand)
+		{
+			tile = winningHand[i];
+			if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI*1.5,c.width-30,c.height/2-winningHand.length*25 + i*50,50,66)
+			}
+			else
+			drawImageRotated(Img[tile],Math.PI*1.5,c.width-30,c.height/2-winningHand.length*25  + i*50,50,66)
+		}
+		}
+		else
+		{
+		for(var i=0;i<tiles;i++)
+		{
+			ctx.rect(c.width-120, start + i*50, 30, 50);
+			ctx.fillStyle = "white";
+			ctx.fill();
+			ctx.strokeStyle = '#000000'; 
+			ctx.stroke();
+		}
+		}
+		//there
+		for(var i in playerData[x].flower)
+		{
+			tile = playerData[x].flower[i];
+			if(tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI*1.5,c.width-120,startFlower+i*50,50,66)
+			}
+			else
+			drawImageRotated(Img[tile],Math.PI*1.5,c.width-120,startFlower+i*50,50,66)
+		}
+		
+		startFlower+= playerData[x].flower.length*50 + 5
+		for(var i in playerData[x].shownHand)
+		{
+			tiles = playerData[x].shownHand[i];
+			for(var g in tiles)
+			{
+				tile = tiles[g];
+				if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+			{
+				drawImageRotated(Img[tile.slice(0,-1)][tile.slice(-1)],Math.PI*1.5,c.width-120,startFlower+g*50,50,66)
+			}
+				else
+				drawImageRotated(Img[tile],Math.PI*1.5,c.width-120,startFlower+g*50,50,66)
+			}
+			startFlower+= playerData[x].shownHand[i].length*50 +5;
+		}	
+	}
+
+	function drawSelect(){
+		var start = c.width/2- myTiles.length*25
+		ctx.beginPath();
+		var totalHand =  playerData[myPosition].shownHand.length * 3
+		if(parseInt(selection) + totalHand!=13)
+		ctx.rect(start + selection*50, c.height-90, 50, 66);
+		else
+		ctx.rect(start + selection*50 + 50, c.height-90, 50, 66);
+			ctx.strokeStyle = "rgba(255,0,0)";
+			ctx.stroke();
+			ctx.strokeStyle = "rgba(0,0,0)";
+			ctx.closePath();
+		if(selection2!=-1)
+		{
+			ctx.beginPath();
+			if(parseInt(selection2) + totalHand!=13)
+			ctx.rect(start + selection2*50, c.height-90, 50, 66);
+			else
+			ctx.rect(start + selection2*50 + 50, c.height-90, 50, 66);
+			ctx.strokeStyle = "rgba(255,0,0)";
+			ctx.stroke();
+			ctx.strokeStyle = "rgba(0,0,0)";
+			ctx.closePath();
+		}
+	}
+
+	function discard(){
+		if(selection != -1)
+		socket.emit("discard",{
+			myPosition:myPosition,
+			selection:selection,
+		})
+		selection = -1;
+	}
+
+	function draw(){
+		socket.emit("draw",{
+			myPosition:myPosition,
+		})
+		displayDraw = false;
+		displayChi = false;
+		displayPong = false;
+		displayGang = false;
+		displayHu = false;
+	}
+	
+	function chi(){
+		if(selection2 != -1 && selection != -1)
+		socket.emit("chi",{
+			myPosition:myPosition,
+			selection:selection,
+			selection2:selection2
+		})
+	}
+
+	function pong(){
+		socket.emit("pong2",{
+			myPosition:myPosition
+		})
+	}
+
+	function gang(){
+		socket.emit("gang",{
+			myPosition:myPosition
+		})
+	}
+
+	function angang(){
+		socket.emit("angang",{
+			myPosition:myPosition
+		})
+	}
+
+	
+	function minggang(){
+		socket.emit("minggang",{
+			myPosition:myPosition
+		})
+	}
+
+	function endround(){
+		socket.emit("endround")
+		displayEndRound = false;
+	}
+
+	function hu(){
+		if(confirmHu==false)
+		confirmHu=true;
+		else
+		{
+		socket.emit("hu",{
+			myPosition:myPosition
+		})
+	}
+	}
+
+	function drawDiscardPile(){
+		for(i in discardPile){
+			tile = discardPile[i];
+			if(tile.slice(0,3)=="man"||tile.slice(0,3)=="ton"||tile.slice(0,3)=="suo"||tile.slice(0,3)=="hua"||tile.slice(0,6)=="redhua")
+				ctx.drawImage(Img[tile.slice(0,-1)][tile.slice(-1)],c.width/2-450+(parseInt(i)%22)*40,200+Math.floor(parseInt(i)/22)*66	,50,66)
+			else
+				ctx.drawImage(Img[tile],c.width/2-450+(parseInt(i)%22)*40,200+Math.floor(parseInt(i)/22)*66,50,66)
+		}
+		if(tilesLeft != -1)
+		{
+			ctx.fillStyle = '#000000';
+			ctx.font = '15pt Kremlin Pro Web';
+			ctx.fillText("Tiles left: "+ tilesLeft, 250, 500);
+		}	
+		ctx.fillStyle = '#000000';
+			ctx.font = '15pt Kremlin Pro Web';
+			ctx.fillText("$"+ playerData[myPosition].money.toFixed(2), 250, 520);
+	}
+
+	document.addEventListener('keydown', function(event) {
+    if(event.keyCode == 37) {
+        console.log(playerData);
+	}});
+
+	chat.addEventListener('focus', function(event){
+		console.log("FOCUS")
+		chatText.style.display = "inline-block";
+	})
+
+	
+	chat.addEventListener('blur', function(event){
+		console.log("BLUR")
+		chatText.style.display = "none";
+	})
+
+	c.addEventListener('mousemove',function(e){
+		var rect = c.getBoundingClientRect();
+		var x = e.clientX - rect.left;
+		var y = e.clientY - rect.top;
+		var start = c.width/2- myTiles.length*25
+		if(x>c.width/2-100 && x< c.width/2+100 && y>c.height/2-50 && y<c.height/2+50 && displayRoll == true)
+			document.documentElement.style.cursor = "hand";
+		else if(x>c.width/2-60 && x< c.width/2+90 && y>c.height/2-50 && y<c.height/2+50 && displayPong == true)
+			document.documentElement.style.cursor = "hand";
+		else if(x>c.width/2-60 && x< c.width/2+90 && y>c.height/2+70 && y<c.height/2+170 && displayGang == true)
+		document.documentElement.style.cursor = "hand";
+		else if(x>c.width/2+120 && x< c.width/2+240 && y>c.height/2-50 && y<c.height/2+50 && displayChi == true)
+		document.documentElement.style.cursor = "hand";
+		else if(x>c.width/2-240 && x< c.width/2-90 && y>c.height/2-50 && y<c.height/2+50 && displayDraw == true)
+		document.documentElement.style.cursor = "hand";
+		else if(x>c.width/2+270 && x< c.width/2+410 && y>c.height/2-50 && y<c.height/2+50 && displayHu == true)
+		document.documentElement.style.cursor = "hand";
+		else if(x>c.width/2+30 && x< c.width/2+230 && y>c.height/2-50 && y<c.height/2+50 && displayDiscard == true)
+		document.documentElement.style.cursor = "hand";
+		else if(x>c.width/2-60 && x< c.width/2+180 && y>c.height/2+70 && y<c.height/2+170 && displayAnGang == true)
+		document.documentElement.style.cursor = "hand";
+		if(x>c.width/2+200 && x< c.width/2+480 && y>c.height/2+70 && y<c.height/2+170 && displayMingGang == true)
+		document.documentElement.style.cursor = "hand";
+		if(x>c.width/2-150 && x< c.width/2+150 && y>c.height/2-50 && y<c.height/2+50 && displayEndRound == true)
+		document.documentElement.style.cursor = "hand";
+		else
+		document.documentElement.style.cursor = "";
+	}
+	)
+
+  	c.addEventListener('click', function(e) {
+		var rect = c.getBoundingClientRect();
+		var x = e.clientX - rect.left;
+		var y = e.clientY - rect.top;
+		var start = c.width/2- myTiles.length*25
+		var clickedsmt = false;
+		if(x>c.width/2-100 && x< c.width/2+100 && y>c.height/2-50 && y<c.height/2+50 && displayRoll == true)
+		{
+		socket.emit("roll",{socketid:socketid})	
+		displayRoll = false;
+		var clickedsmt = true;
+		}
+		//Pong ctx.rect(c.width/2 - 60,	 c.height/2-50, 150, 100); 
+		if(x>c.width/2-60 && x< c.width/2+90 && y>c.height/2-50 && y<c.height/2+50 && displayPong == true)
+		{
+		pong();
+		var clickedsmt = true;
+		}
+		
+		//gang  ctx.rect(c.width/2 - 60,	 c.height/2+70, 150, 100); 
+		if(x>c.width/2-60 && x< c.width/2+90 && y>c.height/2+70 && y<c.height/2+170 && displayGang == true)
+		{
+		gang();
+		var clickedsmt = true;
+		}
+		//angang 	ctx.rect(c.width/2 - 60,	 c.height/2+70, 240, 100); 
+		if(x>c.width/2-60 && x< c.width/2+180 && y>c.height/2+70 && y<c.height/2+170 && displayAnGang == true)
+		{
+		angang();
+		var clickedsmt = true;
+		}
+		//minggang ctx.rect(c.width/2 +200,	 c.height/2+70, 280, 100); 
+		if(x>c.width/2+200 && x< c.width/2+480 && y>c.height/2+70 && y<c.height/2+170 && displayMingGang == true)
+		{
+		minggang();
+		var clickedsmt = true;
+		}
+
+		//chi ctx.rect(c.width/2 +120,	 c.height/2-50, 120, 100); 
+		if(x>c.width/2+120 && x< c.width/2+240 && y>c.height/2-50 && y<c.height/2+50 && displayChi == true)
+		{
+		chi()
+		var clickedsmt = true;
+		}
+		//draw ctx.rect(c.width/2 -240,	 c.height/2-50, 150, 100); 
+		if(x>c.width/2-240 && x< c.width/2-90 && y>c.height/2-50 && y<c.height/2+50 && displayDraw == true)
+		{
+		draw();
+		var clickedsmt = true;
+		}
+		//hu ctx.rect(c.width/2+270, c.height/2-50, 140, 100); 
+		if(x>c.width/2+270 && x< c.width/2+410 && y>c.height/2-50 && y<c.height/2+50 && displayHu == true)
+		{
+		hu()
+		var clickedsmt = true;
+		}
+		//discard
+		if(x>c.width/2+30 && x< c.width/2+230 && y>c.height/2-50 && y<c.height/2+50 && displayDiscard == true)
+		{
+		discard();
+		var clickedsmt = true;
+		}
+		//endround ctx.rect(c.width/2 -150,	 c.height/2-50, 300, 100); 
+		if(x>c.width/2-150 && x< c.width/2+150 && y>c.height/2-50 && y<c.height/2+50 && displayEndRound == true)
+		{
+		endround()
+		var clickedsmt = true;
+		}
+		var totalHand =  playerData[myPosition].shownHand.length * 3
+		for(let i in myTiles){
+			if(x>start + i*50 && x< start + i*50 + 50 && y>c.height-90 && y<c.height- 90 + 66 && totalHand+parseInt(i)!=13)
+			{
+				if(selection != -1 && selection2 != -1 && displayChi == true)
+				{
+					selection2 = -1;
+					selection = i;
+					clickedsmt = true;
+				}
+				else if(selection != -1 && selection2 == -1 && displayChi == true)
+				{
+					selection2 = i;
+					clickedsmt = true;
+				}
+				else
+				{
+				selection = i;
+				clickedsmt = true;
+				}
+			}
+			if(x>start+50 + i*50 && x< start + i*50+50  + 50 && y>c.height-90 && y<c.height- 90 + 66 && totalHand+parseInt(i)==13)
+			{
+				if(selection != -1 && selection2 != -1 && displayChi == true)
+				{
+					selection2 = -1;
+					selection = i;
+					clickedsmt = true;
+				}
+				else if(selection != -1 && selection2 == -1 && displayChi == true)
+				{
+					selection2 = i;
+					clickedsmt = true;
+				}
+				else
+				{
+				selection = i;
+				clickedsmt = true;
+				}
+			}
+		}
+		if(clickedsmt==false)
+		{
+			selection=-1;
+			selection2=-1;
+			confirmHu = false;
+			chatText.style.display = "none";
+		}
+		
+		console.log(selection2)
+		console.log(selection)
+		if(firstLoad){
+			audio.gang = new Howl({
+			src: ['gang.wav']
+			});
+		audio.pong = new Howl({
+			src: ['pong.wav']
+			});
+		audio.hu = new Howl({
+			src: ['hu.wav']
+			});
+		audio.tak = new Howl({
+			src: ['tak.wav']
+			});
+		audio.hua = new Howl({
+			src: ['hua.mp3'],
+			volume: 0.5,
+			});
+		audio.knock = new Howl({
+			src: ['knock.mp3'],
+			volume:0.3,
+		});
+		audio.coffin = new Howl({
+			src: ['coffin.mp3'],
+			volume:0.3,
+		});
+		audio.cao = new Howl({
+			src: ['cao.mp3'],
+			volume:0.3,
+		});
+		audio.what = new Howl({
+			src: ['what.mp3'],
+			volume:0.3,
+		});
+		audio.wow = new Howl({
+			src: ['wow.mp3'],
+			volume:0.3,
+		});
+		firstLoad = false;
+		}
+ 	 }, false);
+
+	setInterval(function(){
+		ctx.clearRect(0,0,c.width,c.height)
+		drawBackground();	
+		drawDiscardPile();
+		drawMyTiles();	
+		drawTilesFront(playerData[(parseInt(myPosition)+2)%4].handsize);
+		drawTilesLeft(playerData[(parseInt(myPosition)+3)%4].handsize);
+		drawTilesRight(playerData[(parseInt(myPosition)+1)%4].handsize);
+		if(selection != -1)
+		drawSelect();
+		if(displayDice)
+		drawDice();
+		if(displayRoll)
+		drawRoll();
+		if(displayName)
+		drawName();
+		if(displayDiscard)
+		drawDiscard();
+		if(displayHu)
+		drawHu();
+		if(displayChi)
+		drawChi();
+		if(displayDraw)
+		drawDraw();
+		if(displayPong)
+		drawPong();
+		if(displayGang)
+		drawGang();
+		if(displayAnGang)
+		drawAnGang();	
+		if(displayMingGang)
+		drawMingGang();	
+		if(displayEndRound)
+		drawEndRound();
+	},100)
+
+	window.addEventListener("beforeunload", function(e){
+		localStorage.setItem("displayAnGang", displayAnGang)
+		localStorage.setItem("displayChi", displayChi)
+		localStorage.setItem("displayDiscard", displayDiscard)
+		localStorage.setItem("displayDraw", displayDraw)
+		localStorage.setItem("displayEndRound", displayEndRound)
+		localStorage.setItem("displayGang", displayGang)
+		localStorage.setItem("displayHu", displayHu)
+		localStorage.setItem("displayMingGang", displayMingGang)
+		localStorage.setItem("displayPong", displayPong)
+		
+	}, false);	
+
+
+</script>
